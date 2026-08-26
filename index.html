@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>🎾 Tenis Predictor - Dashboard</title>
+<style>
+  :root {
+    --green-dark: #0f3d2e;
+    --green: #1c6e4a;
+    --green-light: #eafaf0;
+    --gold: #ffd54a;
+    --gold-light: #fff6d9;
+    --bg: #f4f6f8;
+    --card: #ffffff;
+    --text: #1c1c1c;
+    --muted: #888;
+    --border: #eee;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', Arial, sans-serif;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
+  header {
+    background: linear-gradient(135deg, var(--green-dark), var(--green));
+    border-radius: 12px; padding: 24px; color: #fff; margin-bottom: 20px;
+  }
+  header h1 { margin: 0 0 6px; font-size: 22px; }
+  header .meta { opacity: .85; font-size: 13px; }
+  .search-box {
+    margin-top: 16px; display: flex; gap: 8px;
+  }
+  .search-box input {
+    flex: 1; padding: 10px 14px; border-radius: 8px; border: none; font-size: 14px;
+  }
+  .search-hint { font-size: 11px; opacity: .75; margin-top: 6px; }
+
+  .match-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+  .match-card {
+    background: var(--card); border-radius: 8px; padding: 12px 16px; cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08); border: 2px solid transparent;
+  }
+  .match-card:hover { border-color: var(--green); }
+  .match-card.active { border-color: var(--green); background: var(--green-light); }
+  .match-card .title { font-weight: 700; font-size: 14px; }
+  .match-card .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  section { margin-bottom: 28px; }
+  h2 { font-size: 17px; margin: 0 0 10px; }
+
+  .card {
+    background: var(--card); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    overflow: hidden; margin-bottom: 14px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 8px 10px; text-align: left; }
+  thead tr { background: #eef2f0; font-size: 11px; color: #555; }
+  tbody tr { border-top: 1px solid var(--border); }
+  tbody tr.value-bet { background: var(--gold-light); }
+  tbody tr.high-conf { background: var(--green-light); }
+  .badge { border-radius: 4px; padding: 1px 6px; font-weight: 700; font-size: 11px; }
+  .badge.gold { background: var(--gold); color: #5a4300; }
+  .muted { color: var(--muted); }
+  .prob { font-weight: 700; color: var(--green); }
+
+  .compare-table td:nth-child(2), .compare-table td:nth-child(3),
+  .compare-table th:nth-child(2), .compare-table th:nth-child(3) { text-align: center; }
+  .compare-table td:first-child { color: var(--muted); font-size: 12px; }
+
+  .empty-state {
+    background: var(--card); border-radius: 8px; padding: 30px; text-align: center;
+    color: var(--muted); box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; font-size: 13px; flex-wrap: wrap; }
+  .toolbar select, .toolbar input[type=number] { padding: 6px 8px; border-radius: 6px; border: 1px solid #ddd; }
+
+  footer { text-align: center; font-size: 11px; color: var(--muted); padding: 20px 0; }
+
+  @media (max-width: 640px) {
+    table { display: block; overflow-x: auto; white-space: nowrap; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🎾 Tenis Predictor - Dashboard</h1>
+    <div class="meta" id="meta-info">Načítám...</div>
+    <div class="search-box">
+      <input type="text" id="player-search" placeholder="Hledej hráče (např. Qinwen Zheng)..." autocomplete="off" />
+    </div>
+    <div class="search-hint">Napiš jméno hráče, kterého dnes hraje - zobrazí se jeho zápas, srovnání se soupeřem a všechny predikce.</div>
+  </header>
+
+  <div id="match-list" class="match-list"></div>
+  <div id="detail-container"></div>
+
+  <section>
+    <h2>📋 Všechny dnešní příležitosti</h2>
+    <div class="toolbar">
+      <label>Min. jistota modelu:
+        <select id="filter-prob">
+          <option value="0">Všechny</option>
+          <option value="50">≥ 50 %</option>
+          <option value="60">≥ 60 %</option>
+          <option value="70" selected>≥ 70 %</option>
+          <option value="80">≥ 80 %</option>
+        </select>
+      </label>
+      <label>Trh:
+        <select id="filter-market">
+          <option value="">Všechny</option>
+        </select>
+      </label>
+    </div>
+    <div class="card"><div id="all-opportunities-table"></div></div>
+  </section>
+
+  <footer>
+    Automaticky generováno tenisovým predikčním systémem. Sázení je rizikové - výstupy modelu
+    nejsou finanční ani sázková rada, jde o statistický odhad. Hraj zodpovědně.
+  </footer>
+</div>
+
+<script>
+let DATA = { matches: [] };
+
+function fmtRecord(rec) {
+  return `${rec.wins}-${rec.losses}`;
+}
+
+function escapeHtml(s) {
+  return String(s ?? '-').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function opportunitiesTableHtml(rows) {
+  if (!rows.length) return '<div style="padding:16px;color:#888;">Žádné příležitosti neodpovídají filtru.</div>';
+  let html = '<table><thead><tr>' +
+    '<th>Zápas</th><th>Hráč</th><th>Trh</th><th>Predikce</th><th>Model %</th><th>Fér kurz</th><th>Živý kurz</th><th>EV</th>' +
+    '</tr></thead><tbody>';
+  for (const r of rows) {
+    const cls = r.is_value_bet ? 'value-bet' : (r.is_high_confidence ? 'high-conf' : '');
+    const badge = r.is_value_bet ? ' 🟡' : (r.is_high_confidence ? ' 🟢' : '');
+    const evCell = r.ev_pct === null || r.ev_pct === undefined
+      ? '<span class="muted">-</span>'
+      : (r.is_value_bet ? `<span class="badge gold">+${r.ev_pct}%</span>` : `<span class="muted">${r.ev_pct}%</span>`);
+    html += `<tr class="${cls}">
+      <td><b>${escapeHtml(r.match_label)}</b><br/><span class="muted" style="font-size:10px;">${escapeHtml(r.tournament)} · ${escapeHtml(r.surface)}${r.round && r.round !== '-' ? ' · ' + escapeHtml(r.round) : ''}</span></td>
+      <td>${escapeHtml(r.player)}</td>
+      <td>${escapeHtml(r.market)}</td>
+      <td><b>${escapeHtml(r.prediction)}</b>${badge}</td>
+      <td class="prob">${r.probability_pct}%</td>
+      <td>${escapeHtml(r.fair_odds)}</td>
+      <td>${escapeHtml(r.live_odds)}</td>
+      <td>${evCell}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  return html;
+}
+
+function compareTableHtml(match) {
+  const a = match.player_a, b = match.player_b;
+  const rows = [
+    ['Ruka', a.hand === 'L' ? 'levá' : (a.hand === 'R' ? 'pravá' : '-'), b.hand === 'L' ? 'levá' : (b.hand === 'R' ? 'pravá' : '-')],
+    ['Výška', a.height_cm ? a.height_cm + ' cm' : '-', b.height_cm ? b.height_cm + ' cm' : '-'],
+    ['Věk', a.age ?? '-', b.age ?? '-'],
+    ['Elo (celkové)', a.elo_overall, b.elo_overall],
+    [`Elo (${match.surface})`, a.elo_surface, b.elo_surface],
+    ['Zápasů v databázi', a.matches_played, b.matches_played],
+    [`Bilance sezóna ${a.season_year}`, fmtRecord({wins: a.season_wins, losses: a.season_losses}), fmtRecord({wins: b.season_wins, losses: b.season_losses})],
+    [`Bilance povrch ${a.surface} (kariéra)`, fmtRecord({wins: a.surface_wins, losses: a.surface_losses}), fmtRecord({wins: b.surface_wins, losses: b.surface_losses})],
+  ];
+  let html = `<table class="compare-table"><thead><tr><th>Statistika</th><th>${escapeHtml(a.name)}</th><th>${escapeHtml(b.name)}</th></tr></thead><tbody>`;
+  for (const [label, va, vb] of rows) {
+    html += `<tr><td>${label}</td><td>${escapeHtml(va)}</td><td>${escapeHtml(vb)}</td></tr>`;
+  }
+  html += '</tbody></table>';
+  return html;
+}
+
+function h2hHtml(match) {
+  const h = match.h2h;
+  let html = `<div style="padding:12px 16px;font-size:13px;"><b>Vzájemné zápasy:</b> ${escapeHtml(match.player_a.name)} ${h.wins_a} - ${h.wins_b} ${escapeHtml(match.player_b.name)}</div>`;
+  if (!h.meetings.length) {
+    html += '<div style="padding:0 16px 16px;color:#888;font-size:12px;">Zatím se v databázi nepotkali.</div>';
+    return html;
+  }
+  html += '<table><thead><tr><th>Datum</th><th>Turnaj</th><th>Povrch</th><th>Kolo</th><th>Skóre</th><th>Vítěz</th></tr></thead><tbody>';
+  for (const m of h.meetings) {
+    const winnerName = m.winner === 'a' ? match.player_a.name : match.player_b.name;
+    html += `<tr><td>${escapeHtml(m.date)}</td><td>${escapeHtml(m.tournament)}</td><td>${escapeHtml(m.surface)}</td><td>${escapeHtml(m.round)}</td><td>${escapeHtml(m.score)}</td><td>${escapeHtml(winnerName)}</td></tr>`;
+  }
+  html += '</tbody></table>';
+  return html;
+}
+
+function renderDetail(match) {
+  const el = document.getElementById('detail-container');
+  el.innerHTML = `
+    <section>
+      <h2>🎾 ${escapeHtml(match.player_a.name)} vs ${escapeHtml(match.player_b.name)}</h2>
+      <div class="muted" style="margin:-6px 0 12px;font-size:12px;">${escapeHtml(match.tournament)} · ${escapeHtml(match.surface)}${match.round ? ' · ' + escapeHtml(match.round) : ''}${match.level ? ' · ' + escapeHtml(match.level) : ''}</div>
+
+      <div class="card"><div style="padding:4px 0;">${opportunitiesTableHtml(match.opportunities)}</div></div>
+
+      <h2 style="font-size:15px;margin-top:20px;">Srovnání hráčů</h2>
+      <div class="card">${compareTableHtml(match)}</div>
+
+      <h2 style="font-size:15px;">Vzájemná bilance (H2H)</h2>
+      <div class="card">${h2hHtml(match)}</div>
+    </section>
+  `;
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderMatchList(matches, activeIndex) {
+  const el = document.getElementById('match-list');
+  if (!matches.length) {
+    el.innerHTML = '<div class="empty-state">Žádný dnešní zápas neodpovídá hledanému jménu.</div>';
+    return;
+  }
+  el.innerHTML = matches.map((m, i) => `
+    <div class="match-card ${i === activeIndex ? 'active' : ''}" data-index="${m._globalIndex}">
+      <div class="title">${escapeHtml(m.player_a.name)} vs ${escapeHtml(m.player_b.name)}</div>
+      <div class="sub">${escapeHtml(m.tournament)} · ${escapeHtml(m.surface)}${m.round ? ' · ' + escapeHtml(m.round) : ''}</div>
+    </div>
+  `).join('');
+  el.querySelectorAll('.match-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const idx = parseInt(card.dataset.index, 10);
+      renderDetail(DATA.matches[idx]);
+      document.querySelectorAll('.match-card').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+    });
+  });
+}
+
+function normalize(s) {
+  return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+function onSearch() {
+  const q = normalize(document.getElementById('player-search').value.trim());
+  document.getElementById('detail-container').innerHTML = '';
+  if (!q) {
+    document.getElementById('match-list').innerHTML = '';
+    return;
+  }
+  const matches = DATA.matches
+    .map((m, i) => ({ ...m, _globalIndex: i }))
+    .filter(m => normalize(m.player_a.name).includes(q) || normalize(m.player_b.name).includes(q));
+  renderMatchList(matches, -1);
+  if (matches.length === 1) {
+    renderDetail(DATA.matches[matches[0]._globalIndex]);
+  }
+}
+
+function allOpportunities() {
+  return DATA.matches.flatMap(m => m.opportunities);
+}
+
+function renderAllOpportunities() {
+  const minProb = parseInt(document.getElementById('filter-prob').value, 10);
+  const market = document.getElementById('filter-market').value;
+  let rows = allOpportunities().filter(r => r.probability_pct >= minProb);
+  if (market) rows = rows.filter(r => r.market === market);
+  rows.sort((a, b) => b.probability_pct - a.probability_pct);
+  document.getElementById('all-opportunities-table').innerHTML = opportunitiesTableHtml(rows);
+}
+
+function populateMarketFilter() {
+  const markets = [...new Set(allOpportunities().map(r => r.market))];
+  const sel = document.getElementById('filter-market');
+  for (const mkt of markets) {
+    const opt = document.createElement('option');
+    opt.value = mkt; opt.textContent = mkt;
+    sel.appendChild(opt);
+  }
+}
+
+async function init() {
+  try {
+    const resp = await fetch('data/predictions.json', { cache: 'no-store' });
+    DATA = await resp.json();
+  } catch (e) {
+    document.getElementById('meta-info').textContent = 'Data se nepodařilo načíst.';
+    return;
+  }
+  document.getElementById('meta-info').textContent =
+    `${DATA.report_date} · ${DATA.matches.length} zápasů · aktualizováno ${new Date(DATA.generated_at).toLocaleString('cs-CZ')}`;
+
+  populateMarketFilter();
+  renderAllOpportunities();
+
+  document.getElementById('player-search').addEventListener('input', onSearch);
+  document.getElementById('filter-prob').addEventListener('change', renderAllOpportunities);
+  document.getElementById('filter-market').addEventListener('change', renderAllOpportunities);
+}
+
+init();
+</script>
+</body>
+</html>
