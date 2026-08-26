@@ -95,6 +95,23 @@
     <div class="search-hint">Napiš jméno hráče, kterého dnes hraje - zobrazí se jeho zápas, srovnání se soupeřem a všechny predikce.</div>
   </header>
 
+  <section>
+    <h2>📊 Statistiky úspěšnosti (zpětné vyhodnocení)</h2>
+    <div class="muted" style="font-size:11px;margin:-4px 0 12px;">
+      Porovnání dřívějších predikcí se skutečnými výsledky. U "Vítěz zápasu" je ROI počítané proti skutečnému živému kurzu z doby predikce - u ostatních trhů žádný živý kurz nikdy neexistoval, takže ROI je simulace proti našemu vlastnímu férovému kurzu s marží ("kdyby někdo nabízel přesně tenhle kurz"), ne reálná obchodovatelná cena. Prázdné buňky = zatím žádné vyhodnocené predikce v tomhle pásmu.
+    </div>
+    <div class="toolbar">
+      <label>Spolehlivost dat:
+        <select id="backtest-filter-reliability">
+          <option value="all" selected>Všechny</option>
+          <option value="reliable">Jen spolehlivé (bez ⚠️)</option>
+          <option value="unreliable">Jen nespolehlivé (⚠️)</option>
+        </select>
+      </label>
+    </div>
+    <div class="card"><div id="backtest-table"></div></div>
+  </section>
+
   <div id="match-list" class="match-list"></div>
   <div id="detail-container"></div>
 
@@ -115,16 +132,15 @@
           <option value="">Všechny</option>
         </select>
       </label>
+      <label>Spolehlivost dat:
+        <select id="filter-reliability">
+          <option value="all">Všechny</option>
+          <option value="reliable">Jen spolehlivé (bez ⚠️)</option>
+          <option value="unreliable">Jen nespolehlivé (⚠️)</option>
+        </select>
+      </label>
     </div>
     <div class="card"><div id="all-opportunities-table"></div></div>
-  </section>
-
-  <section>
-    <h2>📊 Statistiky úspěšnosti (zpětné vyhodnocení)</h2>
-    <div class="muted" style="font-size:11px;margin:-4px 0 12px;">
-      Porovnání dřívějších predikcí se skutečnými výsledky. U "Vítěz zápasu" je ROI počítané proti skutečnému živému kurzu z doby predikce - u ostatních trhů žádný živý kurz nikdy neexistoval, takže ROI je simulace proti našemu vlastnímu férovému kurzu s marží ("kdyby někdo nabízel přesně tenhle kurz"), ne reálná obchodovatelná cena. Prázdné buňky = zatím žádné vyhodnocené predikce v tomhle pásmu.
-    </div>
-    <div class="card"><div id="backtest-table"></div></div>
   </section>
 
   <footer>
@@ -275,8 +291,11 @@ function allOpportunities() {
 function renderAllOpportunities() {
   const minProb = parseInt(document.getElementById('filter-prob').value, 10);
   const market = document.getElementById('filter-market').value;
+  const reliability = document.getElementById('filter-reliability').value;
   let rows = allOpportunities().filter(r => r.probability_pct >= minProb);
   if (market) rows = rows.filter(r => r.market === market);
+  if (reliability === 'reliable') rows = rows.filter(r => !r.low_data_warning);
+  if (reliability === 'unreliable') rows = rows.filter(r => r.low_data_warning);
   rows.sort((a, b) => b.probability_pct - a.probability_pct);
   document.getElementById('all-opportunities-table').innerHTML = opportunitiesTableHtml(rows);
 }
@@ -308,6 +327,12 @@ function backtestTableHtml(rows) {
   return html;
 }
 
+function renderBacktestTable() {
+  const key = document.getElementById('backtest-filter-reliability').value;
+  const rows = (DATA.backtest && DATA.backtest[key]) || [];
+  document.getElementById('backtest-table').innerHTML = backtestTableHtml(rows);
+}
+
 function populateMarketFilter() {
   const markets = [...new Set(allOpportunities().map(r => r.market))];
   const sel = document.getElementById('filter-market');
@@ -331,11 +356,13 @@ async function init() {
 
   populateMarketFilter();
   renderAllOpportunities();
-  document.getElementById('backtest-table').innerHTML = backtestTableHtml(DATA.backtest || []);
+  renderBacktestTable();
 
   document.getElementById('player-search').addEventListener('input', onSearch);
   document.getElementById('filter-prob').addEventListener('change', renderAllOpportunities);
   document.getElementById('filter-market').addEventListener('change', renderAllOpportunities);
+  document.getElementById('filter-reliability').addEventListener('change', renderAllOpportunities);
+  document.getElementById('backtest-filter-reliability').addEventListener('change', renderBacktestTable);
 }
 
 init();
