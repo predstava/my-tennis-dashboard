@@ -119,6 +119,14 @@
     <div class="card"><div id="all-opportunities-table"></div></div>
   </section>
 
+  <section>
+    <h2>📊 Statistiky úspěšnosti (zpětné vyhodnocení)</h2>
+    <div class="muted" style="font-size:11px;margin:-4px 0 12px;">
+      Porovnání dřívějších predikcí se skutečnými výsledky. U "Vítěz zápasu" je ROI počítané proti skutečnému živému kurzu z doby predikce - u ostatních trhů žádný živý kurz nikdy neexistoval, takže ROI je simulace proti našemu vlastnímu férovému kurzu s marží ("kdyby někdo nabízel přesně tenhle kurz"), ne reálná obchodovatelná cena. Prázdné buňky = zatím žádné vyhodnocené predikce v tomhle pásmu.
+    </div>
+    <div class="card"><div id="backtest-table"></div></div>
+  </section>
+
   <footer>
     Automaticky generováno tenisovým predikčním systémem. Sázení je rizikové - výstupy modelu
     nejsou finanční ani sázková rada, jde o statistický odhad. Hraj zodpovědně.
@@ -143,7 +151,8 @@ function opportunitiesTableHtml(rows) {
     '</tr></thead><tbody>';
   for (const r of rows) {
     const cls = r.is_value_bet ? 'value-bet' : (r.is_high_confidence ? 'high-conf' : '');
-    const badge = r.is_value_bet ? ' 🟡' : (r.is_high_confidence ? ' 🟢' : '');
+    let badge = r.is_value_bet ? ' 🟡' : (r.is_high_confidence ? ' 🟢' : '');
+    if (r.low_data_warning) badge += ' <span title="Jeden z hráčů má v databázi příliš málo zápasů - predikce nemusí být spolehlivá">⚠️</span>';
     const evCell = r.ev_pct === null || r.ev_pct === undefined
       ? '<span class="muted">-</span>'
       : (r.is_value_bet ? `<span class="badge gold">+${r.ev_pct}%</span>` : `<span class="muted">${r.ev_pct}%</span>`);
@@ -272,6 +281,33 @@ function renderAllOpportunities() {
   document.getElementById('all-opportunities-table').innerHTML = opportunitiesTableHtml(rows);
 }
 
+function backtestTableHtml(rows) {
+  if (!rows.length) {
+    return '<div style="padding:16px;color:#888;">Zatím nejsou k dispozici žádné vyhodnocené predikce - vrať se za pár dní, až se odehrají a propíšou dnešní zápasy.</div>';
+  }
+  const markets = [...new Set(rows.map(r => r.market))];
+  const buckets = [...new Set(rows.map(r => r.bucket))];
+  const byKey = {};
+  for (const r of rows) byKey[r.market + '|' + r.bucket] = r;
+
+  let html = '<table><thead><tr><th>Trh</th>' + buckets.map(b => `<th>${escapeHtml(b)}</th>`).join('') + '</tr></thead><tbody>';
+  for (const market of markets) {
+    html += `<tr${market === 'Vše' ? ' style="font-weight:700;background:#f7f7f7;"' : ''}><td>${escapeHtml(market)}</td>`;
+    for (const bucket of buckets) {
+      const cell = byKey[market + '|' + bucket];
+      if (!cell || cell.n === 0) {
+        html += '<td class="muted">-</td>';
+        continue;
+      }
+      const roiColor = cell.roi_pct > 0 ? 'color:#1c6e4a;font-weight:700;' : (cell.roi_pct < 0 ? 'color:#b33;' : '');
+      html += `<td>${cell.hit_rate_pct}% <span class="muted" style="font-size:10px;">(n=${cell.n})</span><br/><span style="${roiColor}">ROI ${cell.roi_pct > 0 ? '+' : ''}${cell.roi_pct}%</span></td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  return html;
+}
+
 function populateMarketFilter() {
   const markets = [...new Set(allOpportunities().map(r => r.market))];
   const sel = document.getElementById('filter-market');
@@ -295,6 +331,7 @@ async function init() {
 
   populateMarketFilter();
   renderAllOpportunities();
+  document.getElementById('backtest-table').innerHTML = backtestTableHtml(DATA.backtest || []);
 
   document.getElementById('player-search').addEventListener('input', onSearch);
   document.getElementById('filter-prob').addEventListener('change', renderAllOpportunities);
