@@ -110,6 +110,12 @@
       </label>
     </div>
     <div class="card"><div id="backtest-table"></div></div>
+
+    <h2 style="font-size:15px;">💰 Value bety (EV &gt; 5 %, jen vítěz zápasu)</h2>
+    <div class="muted" style="font-size:11px;margin:-4px 0 12px;">
+      ROI jen přes příležitosti, kde model odhadl EV nad prahem pro 🟡 value bet - ukazuje, jestli se odhadovaná "výhoda" nad živým kurzem skutečně promítá do reálného výdělku. Počítá se jen z trhu Vítěz zápasu (jediný se živým kurzem) a jen ze spolehlivě podložených predikcí (value bet se u ⚠️ řádků nikdy neuděluje).
+    </div>
+    <div class="card"><div id="value-bet-table"></div></div>
   </section>
 
   <div id="match-list" class="match-list"></div>
@@ -333,6 +339,17 @@ function renderBacktestTable() {
   document.getElementById('backtest-table').innerHTML = backtestTableHtml(rows);
 }
 
+function valueBetTableHtml(stat) {
+  if (!stat || !stat.n) {
+    return '<div style="padding:16px;color:#888;">Zatím žádné vyhodnocené value bety.</div>';
+  }
+  const roiColor = stat.roi_pct > 0 ? 'color:#1c6e4a;font-weight:700;' : (stat.roi_pct < 0 ? 'color:#b33;' : '');
+  return `<div style="padding:14px 16px;font-size:14px;">
+    <b>${stat.hit_rate_pct}%</b> <span class="muted" style="font-size:11px;">úspěšnost (n=${stat.n})</span>
+    &nbsp;·&nbsp; ROI <span style="${roiColor}">${stat.roi_pct > 0 ? '+' : ''}${stat.roi_pct}%</span>
+  </div>`;
+}
+
 function populateMarketFilter() {
   const markets = [...new Set(allOpportunities().map(r => r.market))];
   const sel = document.getElementById('filter-market');
@@ -357,6 +374,7 @@ async function init() {
   populateMarketFilter();
   renderAllOpportunities();
   renderBacktestTable();
+  document.getElementById('value-bet-table').innerHTML = valueBetTableHtml(DATA.value_bets);
 
   document.getElementById('player-search').addEventListener('input', onSearch);
   document.getElementById('filter-prob').addEventListener('change', renderAllOpportunities);
